@@ -114,6 +114,7 @@ def main() -> None:
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--ffn-dim", type=int, default=256)
     parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--spatial-attention", action="store_true", help="启用空间注意力")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -176,6 +177,7 @@ def main() -> None:
         input_dim=output_dim + time_features.shape[1] + output_dim, output_dim=output_dim,
         d_model=args.d_model, nhead=args.nhead, num_encoder_layers=args.layers,
         dim_feedforward=args.ffn_dim, dropout=args.dropout, horizon=args.horizon,
+        num_nodes=output_dim, use_spatial_attention=args.spatial_attention,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.HuberLoss()
