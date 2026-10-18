@@ -45,4 +45,20 @@ python src/train_transformer.py \
 - `checkpoints/transformer/test_metrics.json`：Transformer、前一天同一时刻和历史平均基线的 MAE、RMSE、MAPE、WMAPE；
 - `checkpoints/transformer/test_predictions.npz`：测试集真实值和预测值。
 
+## 4. LSTM 对照实验
+
+LSTM 使用完全相同的数据、窗口、时间切分和评价指标：
+
+```bash
+python src/train_lstm.py \
+  --data data/processed/demand_2021_30min.npz \
+  --output-dir checkpoints/lstm_2021 \
+  --lookback 48 \
+  --horizon 1 \
+  --epochs 50 \
+  --batch-size 64
+```
+
+输出 `best.pt`、`test_metrics.json` 和 `test_predictions.npz`，可以直接与 Transformer 结果比较。
+
 显存不足时可降低 `--batch-size 32` 或 `--d-model 64`。RTX 4060 可以先用默认配置运行。
