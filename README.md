@@ -37,6 +37,8 @@ python src/aggregate_demand.py
 python src/train_transformer.py --epochs 50
 ```
 
+LSTM 对照实验和 Transformer 的显式 `lag48` 特征说明见 [训练流程](docs/training_pipeline.md)。
+
 ## 环境安装
 
 Debian/Ubuntu 的系统 Python 可能启用了 PEP 668，不能直接执行全局 `pip install`。建议在项目目录创建虚拟环境：

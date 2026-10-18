@@ -33,8 +33,10 @@ class WindowDataset(Dataset):
 
     def __getitem__(self, index: int):
         t = int(self.targets[index])
+        lag48 = self.x[t - 48:t - 47]
+        lag48 = np.repeat(lag48, self.lookback, axis=0)
         features = np.concatenate(
-            [self.x[t - self.lookback:t], self.y[t - self.lookback:t]], axis=1
+            [self.x[t - self.lookback:t], self.y[t - self.lookback:t], lag48], axis=1
         )
         target = self.x[t:t + self.horizon]
         return torch.from_numpy(features).float(), torch.from_numpy(target).float()
@@ -154,7 +156,7 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TemporalTransformer(
-        input_dim=output_dim + time_features.shape[1], output_dim=output_dim,
+        input_dim=output_dim + time_features.shape[1] + output_dim, output_dim=output_dim,
         d_model=args.d_model, nhead=args.nhead, num_encoder_layers=args.layers,
         dim_feedforward=args.ffn_dim, dropout=args.dropout, horizon=args.horizon,
     ).to(device)
