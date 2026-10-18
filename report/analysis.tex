@@ -5,6 +5,23 @@
 \usepackage{amsmath}
 \usepackage{float}
 \usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{red},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  framerule=0.3pt,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=1.5em,
+  tabsize=2,
+}
+
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue}
 
 \title{基于共享单车数据的需求预测：结果分析与总结}
@@ -17,7 +34,38 @@
 \section{任务概述}
 本作业基于深圳市政府数据开放平台的共享单车企业每日订单表，对2021年1月1日至2月2日期间约300万条订单记录进行了时空需求分析与短时预测建模。将城市范围划分为 $0.01^\circ \times 0.01^\circ$ 的网格，选取订单量最大的30个网格，按30分钟粒度聚合借车量与还车量，构建 $[T, 60]$ 维的需求时序矩阵。预测目标为未来30分钟各网格的借还车量。
 
+全部代码（数据爬取、清洗、聚合、模型训练、评估）已上传至GitHub仓库：\url{https://github.com/wyyy520/BikeDemand}，主要源代码见文末附录。
+
 \section{数据特征分析}
+
+\subsection{实验流程与开发过程截图}
+
+以下截图记录了本作业从数据爬取、环境配置、空间网格划分到模型训练的完整过程。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{爬取300万数据集数据库.png}
+\caption{通过API爬取约300万条订单数据并存入SQLite数据库}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{爬取完成.png}
+\caption{数据爬取完成后的数据库记录统计}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.42\textwidth]{下载pytorch.png}\hfill
+\includegraphics[width=0.5\textwidth]{虚拟环境验证pytorch.png}
+\caption{Python虚拟环境配置与PyTorch安装验证}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{分区块.png}
+\caption{城市空间划分成 $0.01\^\circ × 0.01\^\circ$ 网格并筛选高需求区域}
+\end{figure}
 
 \subsection{时间分布特征}
 对每日订单总量进行统计后发现，数据在时间上分布极不均匀（图\ref{fig:daily}）：2021年1月1日至1月29日期间，全城日订单量仅约300--1100单；而1月30日之后突然跃升至每天11万至72万单，量级相差数百倍。这表明API返回的订单子集在时间维度上存在严重偏斜，前29天数据几乎不构成有效需求信号。
@@ -108,6 +156,29 @@ Transformer训练120轮，验证集loss在第39轮达到最低（0.1418）后早
 \label{fig:curve}
 \end{figure}
 
+以下截图记录了Transformer和LSTM的首次训练结果与调优后的对比。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.45\textwidth]{transformer第一次训练.png}\hfill
+\includegraphics[width=0.45\textwidth]{transformer第一次训练结果.png}
+\caption{Transformer首次训练过程与测试结果}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\textwidth]{优化后的transformer.png}\hfill
+\includegraphics[width=0.45\textwidth]{lstm第一次训练结果.png}
+\caption{左：调优后Transformer训练曲线；右：LSTM首次训练结果}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{优化后的lstm.png}
+\caption{LSTM调优后的训练曲线}
+\end{figure}
+
+
 \section{误差空间分布分析}
 
 对Transformer在测试集上各网格的MAE进行分解（图\ref{fig:spatial}），发现误差在空间上分布不均：部分网格MAE显著高于平均，主要集中在高峰时段订单量最大的网格；而需求较少的网格误差较小。
@@ -159,5 +230,23 @@ Transformer残差模型已将previous-day作为硬编码起点，模型只学习
 \end{enumerate}
 
 若后续继续改进，建议优先扩大数据时间跨度、融合天气与POI特征，并在更充分的测试条件下重新评估空间注意力的作用。
+
+
+
+\newpage
+\section{附录：主要源代码}
+以下列出核心模块的关键代码，完整代码请参见GitHub仓库：\url{https://github.com/wyyy520/BikeDemand}。
+
+\subsection{Transformer模型定义（src/transformer\_model.py）}
+\lstinputlisting[language=Python]{../src/transformer_model.py}
+
+\subsection{Transformer训练脚本（src/train\_transformer.py）}
+\lstinputlisting[language=Python]{../src/train_transformer.py}
+
+\subsection{LSTM模型定义（src/lstm\_model.py）}
+\lstinputlisting[language=Python]{../src/lstm_model.py}
+
+\subsection{需求聚合脚本（src/aggregate\_demand.py）}
+\lstinputlisting[language=Python]{../src/aggregate_demand.py}
 
 \end{document}

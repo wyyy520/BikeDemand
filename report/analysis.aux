@@ -4,30 +4,47 @@
 \HyPL@Entry{0<</S/D>>}
 \@writefile{toc}{\contentsline {section}{\numberline {1}任务概述}{1}{section.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}数据特征分析}{1}{section.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}时间分布特征}{1}{subsection.2.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 每日订单总量分布，1月30日之后量级骤增}}{1}{figure.1}\protected@file@percent }
-\newlabel{fig:daily}{{1}{1}{每日订单总量分布，1月30日之后量级骤增}{figure.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces 高量数据段30分钟粒度时序，呈现早晚双峰}}{2}{figure.2}\protected@file@percent }
-\newlabel{fig:series}{{2}{2}{高量数据段30分钟粒度时序，呈现早晚双峰}{figure.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}空间分布特征}{2}{subsection.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}预测建模}{2}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}方法设计}{2}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}特征构造方法}{2}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}数据划分}{3}{subsection.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}评价指标与结果}{3}{subsection.3.4}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces 模型测试集误差对比（按日期划分）}}{3}{table.1}\protected@file@percent }
-\newlabel{tab:metrics}{{1}{3}{模型测试集误差对比（按日期划分）}{table.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces 各模型MAE与RMSE对比（比例划分下）}}{3}{figure.3}\protected@file@percent }
-\newlabel{fig:compare}{{3}{3}{各模型MAE与RMSE对比（比例划分下）}{figure.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}训练过程}{4}{subsection.3.5}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Transformer按日期划分的训练曲线}}{4}{figure.4}\protected@file@percent }
-\newlabel{fig:curve}{{4}{4}{Transformer按日期划分的训练曲线}{figure.4}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4}误差空间分布分析}{4}{section.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Transformer测试集各网格MAE分布（左：借车，右：还车）}}{4}{figure.5}\protected@file@percent }
-\newlabel{fig:spatial}{{5}{4}{Transformer测试集各网格MAE分布（左：借车，右：还车）}{figure.5}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}原因总结与讨论}{5}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}previous-day基线为何难以超越}{5}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}深度模型的适用条件}{5}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}本次实验的局限}{5}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}总结}{5}{section.6}\protected@file@percent }
-\gdef \@abspage@last{6}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}实验流程与开发过程截图}{1}{subsection.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 通过API爬取约300万条订单数据并存入SQLite数据库}}{1}{figure.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces 数据爬取完成后的数据库记录统计}}{2}{figure.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Python虚拟环境配置与PyTorch安装验证}}{2}{figure.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces 城市空间划分成 $0.01\^\circ × 0.01\^\circ $ 网格并筛选高需求区域}}{3}{figure.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}时间分布特征}{3}{subsection.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces 每日订单总量分布，1月30日之后量级骤增}}{3}{figure.5}\protected@file@percent }
+\newlabel{fig:daily}{{5}{3}{每日订单总量分布，1月30日之后量级骤增}{figure.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces 高量数据段30分钟粒度时序，呈现早晚双峰}}{4}{figure.6}\protected@file@percent }
+\newlabel{fig:series}{{6}{4}{高量数据段30分钟粒度时序，呈现早晚双峰}{figure.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}空间分布特征}{4}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}预测建模}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}方法设计}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}特征构造方法}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}数据划分}{5}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}评价指标与结果}{5}{subsection.3.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces 模型测试集误差对比（按日期划分）}}{5}{table.1}\protected@file@percent }
+\newlabel{tab:metrics}{{1}{5}{模型测试集误差对比（按日期划分）}{table.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces 各模型MAE与RMSE对比（比例划分下）}}{5}{figure.7}\protected@file@percent }
+\newlabel{fig:compare}{{7}{5}{各模型MAE与RMSE对比（比例划分下）}{figure.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}训练过程}{6}{subsection.3.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Transformer按日期划分的训练曲线}}{6}{figure.8}\protected@file@percent }
+\newlabel{fig:curve}{{8}{6}{Transformer按日期划分的训练曲线}{figure.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Transformer首次训练过程与测试结果}}{6}{figure.9}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces 左：调优后Transformer训练曲线；右：LSTM首次训练结果}}{7}{figure.10}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces LSTM调优后的训练曲线}}{7}{figure.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}误差空间分布分析}{7}{section.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Transformer测试集各网格MAE分布（左：借车，右：还车）}}{8}{figure.12}\protected@file@percent }
+\newlabel{fig:spatial}{{12}{8}{Transformer测试集各网格MAE分布（左：借车，右：还车）}{figure.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}原因总结与讨论}{8}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}previous-day基线为何难以超越}{8}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}深度模型的适用条件}{8}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}本次实验的局限}{9}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}总结}{9}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}附录：主要源代码}{10}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Transformer模型定义（src/transformer\_model.py）}{10}{subsection.7.1}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{../src/transformer\textunderscore model.py}{10}{lstlisting.-1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Transformer训练脚本（src/train\_transformer.py）}{12}{subsection.7.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{../src/train\textunderscore transformer.py}{12}{lstlisting.-2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}LSTM模型定义（src/lstm\_model.py）}{16}{subsection.7.3}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{../src/lstm\textunderscore model.py}{16}{lstlisting.-3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}需求聚合脚本（src/aggregate\_demand.py）}{18}{subsection.7.4}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{../src/aggregate\textunderscore demand.py}{18}{lstlisting.-4}\protected@file@percent }
+\gdef \@abspage@last{20}
