@@ -104,8 +104,11 @@ def main() -> None:
     parser.add_argument("--output-dir", default="checkpoints/transformer")
     parser.add_argument("--lookback", type=int, default=48)
     parser.add_argument("--horizon", type=int, default=1)
-    parser.add_argument("--train-ratio", type=float, default=0.70)
-    parser.add_argument("--val-ratio", type=float, default=0.15)
+    parser.add_argument("--train-ratio", type=float, default=None)
+    parser.add_argument("--val-ratio", type=float, default=None)
+    parser.add_argument("--train-start", default=None, help="如 2021-01-30T13:00")
+    parser.add_argument("--train-end", default=None)
+    parser.add_argument("--val-end", default=None)
     parser.add_argument("--d-model", type=int, default=128)
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--layers", type=int, default=2)
@@ -130,18 +133,32 @@ def main() -> None:
     steps, output_dim = demand.shape
     if len(times) != steps or steps <= args.lookback + args.horizon:
         raise SystemExit("时间序列太短，无法构造训练窗口")
-    train_end = int(steps * args.train_ratio)
-    val_end = int(steps * (args.train_ratio + args.val_ratio))
-    if not (0 < train_end < val_end < steps):
-        raise SystemExit("train/val比例不合法")
+    import pandas as pd
+    if args.train_start:
+        # 按日期划分（针对不均匀数据）
+        ts = pd.to_datetime(times, unit="s")
+        mask = ts >= pd.Timestamp(args.train_start)
+        first_idx = int(np.argmax(mask))
+        train_end = int(np.argmax(ts >= pd.Timestamp(args.train_end))) if args.train_end else steps
+        val_end = int(np.argmax(ts >= pd.Timestamp(args.val_end))) if args.val_end else steps
+        if not (first_idx + args.lookback + args.horizon < train_end < val_end <= steps):
+            raise SystemExit("按日期划分后窗口不足，请检查日期范围")
+        steps_offset = first_idx
+        train_start_idx = first_idx
+    else:
+        train_start_idx = 0
+        train_end = int(steps * args.train_ratio)
+        val_end = int(steps * (args.train_ratio + args.val_ratio))
+        if not (0 < train_end < val_end < steps):
+            raise SystemExit("train/val比例不合法")
 
     # 只用训练时段估计变换参数，避免测试集信息泄漏。
     log_demand = np.log1p(demand)
-    mean = log_demand[:train_end].mean(axis=0).astype(np.float32)
-    std = log_demand[:train_end].std(axis=0).astype(np.float32)
+    mean = log_demand[train_start_idx:train_end].mean(axis=0).astype(np.float32)
+    std = log_demand[train_start_idx:train_end].std(axis=0).astype(np.float32)
     std[std < 1e-4] = 1.0
     scaled = ((log_demand - mean) / std).astype(np.float32)
-    train_targets = make_targets(0, train_end, args.lookback, args.horizon)
+    train_targets = make_targets(train_start_idx, train_end, args.lookback, args.horizon)
     val_targets = make_targets(train_end, val_end, args.lookback, args.horizon)
     test_targets = make_targets(val_end, steps, args.lookback, args.horizon)
     if min(len(train_targets), len(val_targets), len(test_targets)) == 0:
@@ -199,10 +216,10 @@ def main() -> None:
         baseline_prev = demand[test_targets - 48]
         result["previous_day"] = metrics(true[:, 0], baseline_prev)
     # 训练集的星期几+半小时槽历史均值基线。
-    train_dt = __import__("pandas").to_datetime(times[:train_end], unit="s")
+    train_dt = __import__("pandas").to_datetime(times[train_start_idx:train_end], unit="s")
     test_dt = __import__("pandas").to_datetime(times[test_targets], unit="s")
     slot = train_dt.dayofweek.to_numpy() * 48 + (train_dt.hour.to_numpy() * 2 + train_dt.minute.to_numpy() // 30)
-    mean_by_slot = {int(k): demand[:train_end][slot == k].mean(axis=0) for k in np.unique(slot)}
+    mean_by_slot = {int(k): demand[train_start_idx:train_end][slot == k].mean(axis=0) for k in np.unique(slot)}
     hist = np.stack([mean_by_slot.get(int(d.dayofweek * 48 + d.hour * 2 + d.minute // 30), demand[:train_end].mean(axis=0)) for d in test_dt])
     result["historical_mean"] = metrics(true[:, 0], hist) if args.horizon == 1 else {"note": "历史平均基线当前实现为单步"}
     metrics_path = output_dir / "test_metrics.json"

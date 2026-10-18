@@ -104,7 +104,7 @@ def main() -> None:
             demand[i, len(selected) + j] += float(row.in_count)
 
     time_features = make_features(times)
-    times_int = (times.asi8 // 10**9).astype(np.int64)
+    times_int = (times.as_unit("ns").asi8 // 10**9).astype(np.int64)
     np.savez_compressed(output, times=times_int, demand=demand, time_features=time_features)
     metadata = {
         "source": str(source), "orders_read": total, "time_frequency": "30min",
