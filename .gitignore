@@ -1,0 +1,14 @@
+# Local credentials and downloaded data
+.env.local
+config_local.py
+data/raw/*
+data/processed/*
+checkpoints/*
+*.sqlite
+*.sqlite3
+*.db
+*.jsonl
+*.log
+__pycache__/
+.venv/
+*.key

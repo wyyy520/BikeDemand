@@ -1,0 +1,29 @@
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  time_frequency: 30min
+  lookback: 48
+  horizon: 1
+  top_stations: 30
+
+split:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+model:
+  name: temporal_transformer
+  d_model: 128
+  nhead: 4
+  num_encoder_layers: 2
+  dim_feedforward: 256
+  dropout: 0.1
+
+training:
+  seed: 42
+  batch_size: 64
+  epochs: 50
+  learning_rate: 0.0003
+  weight_decay: 0.00001
+  early_stopping_patience: 5
+  loss: huber
