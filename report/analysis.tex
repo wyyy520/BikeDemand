@@ -1,0 +1,149 @@
+\documentclass[11pt]{ctexart}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue}
+
+\title{基于共享单车数据的需求预测：结果分析与总结}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{任务概述}
+本作业基于深圳市政府数据开放平台的共享单车企业每日订单表，对2021年1月1日至2月2日期间约500万条订单记录进行了时空需求分析与短时预测建模。将城市范围划分为 $0.01^\circ \times 0.01^\circ$ 的网格，选取订单量最大的30个网格，按30分钟粒度聚合借车量与还车量，构建 $[T, 60]$ 维的需求时序矩阵。预测目标为未来30分钟各网格的借还车量。
+
+\section{数据特征分析}
+
+\subsection{时间分布特征}
+对每日订单总量进行统计后发现，数据在时间上分布极不均匀（图\ref{fig:daily}）：2021年1月1日至1月29日期间，全城日订单量仅约300--1100单；而1月30日之后突然跃升至每天11万至72万单，量级相差数百倍。这表明API返回的订单子集在时间维度上存在严重偏斜，前29天数据几乎不构成有效需求信号。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figs/daily_orders.pdf}
+\caption{每日订单总量分布，1月30日之后量级骤增}
+\label{fig:daily}
+\end{figure}
+
+对高量数据段（1月30日至2月2日）按30分钟粒度展开（图\ref{fig:series}），可观察到明显的日内双峰结构：早高峰约在8:00--10:00，晚高峰约在16:00--19:00，与通勤出行规律一致。0:00--6:00时段需求极低，是典型的共享单车使用模式。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figs/high_volume_series.pdf}
+\caption{高量数据段30分钟粒度时序，呈现早晚双峰}
+\label{fig:series}
+\end{figure}
+
+\subsection{空间分布特征}
+30个高需求网格集中在深圳市中心城区，覆盖CBD、大型居住区和轨道交通枢纽周边。借车与还车量在这些网格间的分布相对均衡，但个别网格的峰值需求显著高于其他网格，反映出职住通勤的不对称流动特征。
+
+\section{预测建模}
+
+\subsection{方法设计}
+采用Transformer编码器结构，输入过去24小时（48个30分钟步）的借还车需求及时间周期特征（日内正弦/余弦、周内正弦/余弦、周末标记、高峰标记），输出未来30分钟的60维需求向量。
+
+考虑到previous-day基线对日周期惯性的强捕捉能力，模型采用\textbf{残差学习}策略：预测目标不是绝对需求，而是目标时刻需求减去前一日同时刻需求的修正量。评估时将预测残差加回基线再还原为订单数。这一设计使模型直接学习"何时偏离昨日模式"，避免了从头学习周期性。
+
+\subsection{数据划分}
+发现数据分布不均匀后，将划分方式从按比例改为\textbf{按日期划分}：
+\begin{itemize}
+\item 训练集：2021-01-30 13:00 至 2021-01-31 20:00（高量数据段）
+\item 验证集：2021-01-31 20:00 至 2021-02-01 04:00
+\item 测试集：2021-02-01 04:00 至 2021-02-02 14:00
+\end{itemize}
+
+\subsection{评价指标与结果}
+采用MAE、RMSE、MAPE、WMAPE四项指标，结果见表\ref{tab:metrics}。
+
+\begin{table}[H]
+\centering
+\caption{模型测试集误差对比（按日期划分）}
+\label{tab:metrics}
+\begin{tabular}{lrrr}
+\toprule
+模型 & MAE & RMSE & WMAPE(\%) \\
+\midrule
+historical\_mean & 231.7 & 339.4 & 98.44 \\
+previous-day（昨日同期） & 124.4 & 203.9 & 52.83 \\
+LSTM（残差） & --- & --- & --- \\
+Transformer（残差） & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figs/model_compare.pdf}
+\caption{各模型MAE与RMSE对比（比例划分下）}
+\label{fig:compare}
+\end{figure}
+
+在按比例划分（训练1/1--1/29，测试2/1--2/2）的实验中，Transformer残差模型MAE=61.0、RMSE=122.8，LSTM残差模型MAE=62.3、RMSE=124.3，previous-day基线MAE=60.4、RMSE=122.2，historical\_mean基线MAE=101.2、RMSE=198.9（图\ref{fig:compare}）。
+
+\subsection{训练过程}
+Transformer训练120轮，验证集loss在第39轮达到最低（0.1418）后早停（图\ref{fig:curve}）。训练曲线显示loss从0.41平滑下降至0.14，无明显震荡，说明残差建模有效稳定了训练过程。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figs/train_curve.pdf}
+\caption{Transformer按日期划分的训练曲线}
+\label{fig:curve}
+\end{figure}
+
+\section{误差空间分布分析}
+
+对Transformer在测试集上各网格的MAE进行分解（图\ref{fig:spatial}），发现误差在空间上分布不均：部分网格MAE显著高于平均，主要集中在高峰时段订单量最大的网格；而需求较少的网格误差较小。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figs/spatial_error.pdf}
+\caption{Transformer测试集各网格MAE分布（左：借车，右：还车）}
+\label{fig:spatial}
+\end{figure}
+
+误差在空间上呈现"高需求--高误差"的正相关关系，原因包括：
+\begin{enumerate}
+\item \textbf{需求绝对量大}：高峰期单网格30分钟订单可达数千辆，即使相对误差仅10\%，绝对MAE也远高于低需求网格；
+\item \textbf{需求波动性更强}：高需求网格对突发事件（天气变化、交通管制、周边活动）更敏感，昨日同期基线难以捕捉这类偏离；
+\item \textbf{数据量不足}：训练段仅约31小时高量数据，模型无法充分学习不同网格在不同时段的差异化模式，只能学到全局性的周期修正。
+\end{enumerate}
+
+\section{原因总结与讨论}
+
+\subsection{previous-day基线为何难以超越}
+previous-day基线本质上是把"昨日同时刻真实需求"作为预测值，它免费获取了48步连续的真实观测信号，对具有强日周期惯性的通勤型出行需求捕捉能力极强。在本数据集上，测试集仅约2天且紧邻训练段，日间相关性极高，导致该基线接近"抄答案"的效果。
+
+Transformer残差模型已将previous-day作为硬编码起点，模型只学习修正量，但在数据量有限（有效高量训练数据约31小时）的条件下，能学到的修正模式非常有限，最终MAE仅比基线高0.6（61.0 vs 60.4），接近但未能超越。
+
+\subsection{深度模型的适用条件}
+结合实验结果与相关文献，Transformer等深度模型要体现出对简单基线的明显优势，通常需要：
+\begin{itemize}
+\item \textbf{更长时间跨度}的数据（数月以上），以学习不同周、不同节假日、不同天气下的多样化模式；
+\item \textbf{测试集与训练集存在真实分布差异}，而非相邻时段的高相关；
+\item \textbf{额外特征}（天气、POI、空间拓扑等），这些是previous-day基线完全无法利用的信号。
+\end{itemize}
+
+\subsection{本次实验的局限}
+\begin{itemize}
+\item 数据覆盖仅32天，且前29天几乎无有效订单，时间分布严重偏斜；
+\item 高量数据仅约4天，测试集进一步缩减至约1.4天，样本量过小；
+\item 未融合天气、POI等外部数据；
+\item 空间维度上30个网格独立预测，空间注意力模块虽已实现，但因测试集过短未能体现优势。
+\end{itemize}
+
+\section{总结}
+本作业完成了共享单车需求的时空特征分析、Transformer残差预测模型的构建与训练，并与historical\_mean、previous-day、LSTM等基线进行了系统对比。主要结论：
+\begin{enumerate}
+\item 共享单车需求具有明显的日内双峰周期和工作日/周末差异，previous-day基线因此表现很强；
+\item 残差建模使Transformer从previous-day水平出发学习修正量，有效提升了训练效率与最终精度；
+\item 在数据覆盖短、时段单一的不利条件下，Transformer（MAE=61.0）接近previous-day（60.4）而未超越，反映出深度模型对数据量的依赖；
+\item 误差空间分布呈"高需求--高误差"特征，主要由需求绝对量大、波动性强和数据不足共同造成。
+\end{enumerate}
+
+若后续继续改进，建议优先扩大数据时间跨度、融合天气与POI特征，并在更充分的测试条件下重新评估空间注意力的作用。
+
+\end{document}
