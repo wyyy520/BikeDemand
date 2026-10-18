@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""训练 LSTM 需求预测模型，评估流程与 train_transformer.py 保持一致。"""
+"""训练 LSTM 需求预测模型，评估流程与 train_transformer.py 保持一致。
+
+目标为残差：y 减去前一天同期需求（lag48），评估时加回基线。"""
 
 from __future__ import annotations
 
@@ -30,11 +32,14 @@ class WindowDataset(Dataset):
 
     def __getitem__(self, index):
         t = int(self.targets[index])
+        lag48 = np.repeat(self.demand[t - 48:t - 47], self.lookback, axis=0)
         x = np.concatenate([
             self.demand[t - self.lookback:t],
             self.time_features[t - self.lookback:t],
+            lag48,
         ], axis=1)
-        y = self.demand[t:t + self.horizon]
+        baseline = np.repeat(self.demand[t - 48:t - 48 + self.horizon], self.horizon, axis=0)
+        y = self.demand[t:t + self.horizon] - baseline
         return torch.from_numpy(x).float(), torch.from_numpy(y).float()
 
 
@@ -70,8 +75,9 @@ def predict(model, loader, device, mean, std):
     for x, y in loader:
         pred = model(x.to(device)).cpu().numpy()
         y = y.numpy()
-        pred_all.append(np.expm1(pred * std + mean).clip(0))
-        true_all.append(np.expm1(y * std + mean).clip(0))
+        baseline = np.repeat(x[:, -48:-47, :pred.shape[2]].cpu().numpy(), pred.shape[1], axis=1)
+        pred_all.append(np.expm1((pred + baseline) * std + mean).clip(0))
+        true_all.append(np.expm1((y + baseline) * std + mean).clip(0))
     return np.concatenate(true_all), np.concatenate(pred_all)
 
 
@@ -134,7 +140,7 @@ def main():
     ]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = DemandLSTM(
-        input_dim=output_dim + time_features.shape[1], output_dim=output_dim,
+        input_dim=output_dim + time_features.shape[1] + output_dim, output_dim=output_dim,
         hidden_dim=args.hidden_dim, num_layers=args.layers,
         dropout=args.dropout, horizon=args.horizon,
     ).to(device)

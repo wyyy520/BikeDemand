@@ -5,7 +5,7 @@
     python src/aggregate_demand.py
     python src/train_transformer.py --epochs 30
 
-目标值使用 log1p 后按训练集特征标准化，评估时还原为订单数。
+目标改为残差：y 减去前一天同期需求（lag48），模型学习对 previous-day 基线的修正量，评估时把残差加回基线后还原为订单数。
 """
 
 from __future__ import annotations
@@ -33,12 +33,12 @@ class WindowDataset(Dataset):
 
     def __getitem__(self, index: int):
         t = int(self.targets[index])
-        lag48 = self.x[t - 48:t - 47]
-        lag48 = np.repeat(lag48, self.lookback, axis=0)
+        lag48 = np.repeat(self.x[t - 48:t - 47], self.lookback, axis=0)
         features = np.concatenate(
             [self.x[t - self.lookback:t], self.y[t - self.lookback:t], lag48], axis=1
         )
-        target = self.x[t:t + self.horizon]
+        baseline = np.repeat(self.x[t - 48:t - 48 + self.horizon], self.horizon, axis=0)
+        target = self.x[t:t + self.horizon] - baseline
         return torch.from_numpy(features).float(), torch.from_numpy(target).float()
 
 
@@ -74,9 +74,9 @@ def predict(model, loader, device, mean, std):
     for features, target in loader:
         prediction = model(features.to(device)).cpu().numpy()
         true = target.numpy()
-        # prediction/target are standardized log1p counts.
-        pred_count = np.expm1(prediction * std + mean).clip(0)
-        true_count = np.expm1(true * std + mean).clip(0)
+        baseline = np.repeat(features[:, -48:-47, :prediction.shape[2]].cpu().numpy(), prediction.shape[1], axis=1)
+        pred_count = np.expm1((prediction + baseline) * std + mean).clip(0)
+        true_count = np.expm1((true + baseline) * std + mean).clip(0)
         all_pred.append(pred_count)
         all_true.append(true_count)
     return np.concatenate(all_true), np.concatenate(all_pred)
