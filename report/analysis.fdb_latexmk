@@ -1,10 +1,10 @@
 # Fdb version 4
-["xdvipdfmx"] 1792323786.87586 "analysis.xdv" "analysis.pdf" "analysis" 1792323787.07437 0
-  "analysis.xdv" 1792323786.81946 56436 a89104b777763ed7e3e7a8e090f4ae4e "xelatex"
+["xdvipdfmx"] 1792325180.90014 "analysis.xdv" "analysis.pdf" "analysis" 1792325181.09613 0
+  "analysis.xdv" 1792325180.84304 62472 d7f7302f648f78c6c30592c1de1c098e "xelatex"
   (generated)
   "analysis.pdf"
   (rewritten before read)
-["xelatex"] 1792323786.20575 "analysis.tex" "analysis.xdv" "analysis" 1792323787.07351 0
+["xelatex"] 1792325180.21866 "analysis.tex" "analysis.xdv" "analysis" 1792325181.0952 0
   "/etc/texmf/web2c/texmf.cnf" 1789268768.46381 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136768653 1528 f853c4d1b4e0550255e02831fdc8496f ""
@@ -95,9 +95,9 @@
   "/usr/share/texmf/tex/latex/CJK/CJKfntef.sty" 1634405102 12851 25a9b5cc006609feb5c9a20ce24a5392 ""
   "/usr/share/texmf/web2c/texmf.cnf" 1769369718 41603 27f93b3067076450172040dcd57ca8b3 ""
   "/var/lib/texmf/web2c/xetex/xelatex.fmt" 1789268906 5950703 ca30da0539cd7f576e63bc122109ab81 ""
-  "analysis.aux" 1792323786.81946 3503 e16bb54286a9946e51ce70926dcfc075 "xelatex"
-  "analysis.out" 1792323786.81946 1525 bfacb457f9948fdcdaa6862f808460ee "xelatex"
-  "analysis.tex" 1792323773.80526 8473 dc99b286ac853c3fbbabb6283d6c773e ""
+  "analysis.aux" 1792325180.84204 3628 8eef12eb404a5cd19b61e4975c3d98d9 "xelatex"
+  "analysis.out" 1792325180.84304 1631 8e65aa6d468d70b621bc3b3a5a699a4f "xelatex"
+  "analysis.tex" 1792325114.50508 9501 4d11a2bd6cd92f6e6ccb3b6b493eba39 ""
   "figs/daily_orders.pdf" 1792323702.46014 14848 eb092e77a5eacbce6ae8dbeb6da02ae1 ""
   "figs/high_volume_series.pdf" 1792323702.56615 16193 7c9cbc632bbc4f6e0af667b84de083ab ""
   "figs/model_compare.pdf" 1792323702.65615 15985 1ae958256ef84a96cf1290ca8d781ca9 ""
