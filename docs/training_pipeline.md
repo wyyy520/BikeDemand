@@ -63,4 +63,10 @@ python src/train_lstm.py \
 
 输出 `best.pt`、`test_metrics.json` 和 `test_predictions.npz`，可以直接与 Transformer 结果比较。
 
+训练过程中还会保存：
+
+- `epoch_001.pt`、`epoch_002.pt` 等每轮权重和优化器状态；
+- `last.pt`：最后一轮状态，可用于断点续训；
+- `best.pt`：验证集损失最低的状态，用于最终测试。
+
 显存不足时可降低 `--batch-size 32` 或 `--d-model 64`。RTX 4060 可以先用默认配置运行。

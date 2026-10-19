@@ -163,9 +163,22 @@ def main():
                 n += len(x)
         val_loss = val_sum / max(n, 1)
         print(f"epoch {epoch:03d} | train_loss={train_loss:.5f} | val_loss={val_loss:.5f}", flush=True)
+        state = {
+            "epoch": epoch,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "args": vars(args),
+            "mean": mean,
+            "std": std,
+        }
+        torch.save(state, output_dir / f"epoch_{epoch:03d}.pt")
+        torch.save(state, output_dir / "last.pt")
         if val_loss < best:
             best, stale = val_loss, 0
-            torch.save({"model": model.state_dict(), "args": vars(args), "mean": mean, "std": std}, checkpoint)
+            state["best_val_loss"] = best
+            torch.save(state, checkpoint)
         else:
             stale += 1
             if stale >= args.patience:
