@@ -1,252 +1,205 @@
 \documentclass[11pt]{ctexart}
-\usepackage[a4paper,margin=2.5cm]{geometry}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{float}
-\usepackage{hyperref}
-\usepackage{listings}
-\usepackage{xcolor}
-\lstset{
-  basicstyle=\ttfamily\scriptsize,
-  keywordstyle=\color{blue}\bfseries,
-  commentstyle=\color{gray}\itshape,
-  stringstyle=\color{red},
-  showstringspaces=false,
-  breaklines=true,
-  frame=single,
-  framerule=0.3pt,
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  xleftmargin=1.5em,
-  tabsize=2,
-}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{graphicx,booktabs,amsmath,amssymb,float,hyperref,xcolor,enumitem,fancyhdr,listings}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\setlist{itemsep=2pt,topsep=3pt,leftmargin=2em}
+\setlength{\parskip}{3pt}
+\setlength{\headheight}{14pt}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single,framerule=.2pt}
+\pagestyle{fancy}\fancyhf{}\lhead{基于共享单车数据的交通需求预测}\rhead{课程分析报告}\cfoot{\thepage}
+\newcommand{\fig}[3]{\begin{figure}[H]\centering\includegraphics[width=#2\linewidth]{#1}\caption{#3}\end{figure}}
+\title{基于共享单车数据的交通需求预测\\\large 时空特征分析、短时建模与空间误差解释}
+\author{}\date{}
+\begin{document}\maketitle
+\begin{abstract}
+以深圳共享单车订单为基础，将城市划分为经纬网格并聚合为30分钟借还需求，使用过去24小时预测下一半小时30个区域的借还量。项目已实现历史平均、昨日同期、LSTM和Transformer。本文整理既有结果：主实验按70\%/15\%/15\%顺序划分，Transformer的MAE为61.01、RMSE为122.78、WMAPE为60.25\%，接近但未超过昨日同期基线。报告分析完整周日与周一的借还差异、高峰与平峰需求，以及网格间预测误差；另列日期划分实验，明确两套结果不能混用。由于样本时间覆盖严重不均衡，结论仅适用于当前样本。
+\end{abstract}
 
-\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue}
+\section{任务定义、数据与处理}
+\subsection{预测目标与数据来源}
+先分析共享单车需求的时空分布，再完成短时预测并与简单基线比较。预测对象是各区域未来30分钟的\textbf{借车量和还车量}。每到一个半小时预测点，使用此前已观测的24小时数据，滚动预测下一时段；测试时允许使用此前已经发生的真实需求，不是一次性预测后续多天。
 
-\title{基于共享单车数据的需求预测：结果分析与总结}
-\author{}
-\date{}
+项目实际使用深圳市政府数据开放平台“共享单车企业每日订单表”，API下载后保存到SQLite。原始库去重后有2,999,528条记录，混合2017年至2021年；本次研究使用2021年清洗订单，聚合脚本读取2,764,231条。字段为开始/结束时间及起点/终点坐标，用户标识不进入模型。现有材料没有证明该来源与课程统一发放文件完全一致，因此报告如实记录实际来源。
 
-\begin{document}
-\maketitle
+\subsection{清洗与时空聚合}
+原始记录按哈希主键去重，清洗剔除缺失或无法解析的时间/坐标、结束时间不晚于开始时间、时长超过24小时、超出深圳近似边界、直线距离超过100 km、平均速度超过50 km/h等记录。
 
-\section{任务概述}
-本作业基于深圳市政府数据开放平台的共享单车企业每日订单表，对2021年1月1日至2月2日期间约300万条订单记录进行了时空需求分析与短时预测建模。将城市范围划分为 $0.01^\circ \times 0.01^\circ$ 的网格，选取订单量最大的30个网格，按30分钟粒度聚合借车量与还车量，构建 $[T, 60]$ 维的需求时序矩阵。预测目标为未来30分钟各网格的借还车量。
+订单没有固定站点ID，故以$0.01^\circ\times0.01^\circ$网格代替站点，原点为纬度22.4、经度113.7。按全期借还总量选取30个高需求网格。订单开始时刻向下取整至半小时，在起点网格计一次借车；结束时刻同样取整，在终点网格计一次还车。补齐完整半小时索引得到$D\in\mathbb{R}^{1565\times60}$，列顺序为30个借车通道、30个还车通道。零槽表示样本没有记录，不保证真实需求为零；借还合计为事件数，不等于独立订单数。
 
-全部代码（数据爬取、清洗、聚合、模型训练、评估）已上传至GitHub仓库：\url{https://github.com/wyyy520/BikeDemand}，主要源代码见文末附录。
+\subsection{样本覆盖限制}
+序列覆盖2021-01-01 00:00至2021-02-02 14:00。前29天在所选网格中的每日借还合计仅数百次，1月30日后大幅增加。图\ref{fig:daily}说明\textbf{采集样本时间覆盖不均}，不能据此判断真实城市需求突然增长数百倍。2月2日为不完整日，末端还车还受订单采样截断影响。
+\begin{figure}[H]\centering\includegraphics[width=.95\linewidth]{figs/daily_orders.pdf}
+\caption{既有每日需求图。图内“全城订单量”应理解为所选30网格的借还事件合计，非全市完整订单量。}\label{fig:daily}\end{figure}
 
-\section{数据特征分析}
+\section{需求时空特征}
+\subsection{周末与工作日的借还差异}
+高量段仅2021-01-31（周日）和2021-02-01（周一）是两个完整日，以下单独比较，不将不完整日混入日均值。工作日按周一至周五、周末按周六日标记，未引入法定节假日调休表。
+\begin{table}[H]\centering\small\caption{完整日借还与日内结构：仅代表当前样本}
+\begin{tabular}{lrr}\toprule
+指标 & 01/31 周日 & 02/01 周一\\\midrule
+全天借车事件/次 & 162,356 & 360,183\\
+全天还车事件/次 & 161,451 & 358,761\\
+早高峰借车占全天/\% & 12.75 & 24.90\\
+晚高峰借车占全天/\% & 23.85 & 23.45\\
+平峰借车占全天/\% & 56.19 & 44.33\\\bottomrule
+\end{tabular}\end{table}
+周一早间借车占比高于周日，周日白天更分散；周一全天借车约为周日2.22倍。但采集覆盖变化与日类型重叠，\textbf{不能将总量差异全部归因于工作日效应}，更不能用各一天归纳一般规律。
 
-\subsection{实验流程与开发过程截图}
+\subsection{早晚高峰、平峰与夜间}
+与代码标记一致，早高峰为07:00--10:00，晚高峰为17:00--20:00，平峰为10:00--17:00及20:00--23:00，夜间为其余时段。不同类别时长不同，故采用\textbf{每半小时平均量}比较。每格为所选30网格合计的“借车/还车”。
+\begin{table}[H]\centering\small\caption{时段借还强度（次/30分钟）}
+\begin{tabular}{lrrr}\toprule
+时段 & 每日槽数 & 周日（借/还） & 周一（借/还）\\\midrule
+早高峰 & 6 & 3,449 / 3,653 & 14,945 / 16,114\\
+晚高峰 & 6 & 6,453 / 6,492 & 14,078 / 13,380\\
+平峰 & 20 & 4,562 / 4,477 & 7,984 / 7,836\\
+夜间 & 16 & 732 / 691 & 1,648 / 1,568\\\bottomrule
+\end{tabular}\end{table}
+周一早晚高峰借车强度约为平峰1.87和1.76倍。早峰还车量高于借车量，晚峰借车高于还车，显示\textbf{所选区域集合}的净流入/流出差异，不能将其解释为全市车辆增减。周日早峰低于平峰，不能对所有日期概括相同双峰。
+\fig{figs/high_volume_series.pdf}{.96}{既有高量段时序（30网格借还事件合计）。工作日早峰明显、周日白天较宽；末日中午骤降亦受采集终点影响。}
 
-以下截图记录了本作业从数据爬取、环境配置、空间网格划分到模型训练的完整过程。
+\subsection{空间单元与需求差异}
+区域需求不均匀。网格ID定义为$1000g_y+g_x$，中心纬度$22.4+(g_y+0.5)\times0.01$、经度$113.7+(g_x+0.5)\times0.01$，可由元数据恢复地理位置。索引0对应网格14042，中心约为$(114.125^\circ E,22.545^\circ N)$。未融合POI，不能直接把网格命名为CBD、住宅区或地铁枢纽；空间误差分析见第5节。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\textwidth]{爬取300万数据集数据库.png}
-\caption{通过API爬取约300万条订单数据并存入SQLite数据库}
-\end{figure}
+\section{特征构造与预测模型}
+\subsection{输入张量、时间编码和归一化}
+对于待预测时刻$t$，使用$D_{t-48:t}$，即过去48步、24小时的60维借还需求。每个历史步另有\textbf{6维时间特征}：日内正弦/余弦、周内正弦/余弦、周末标记及高峰标记。设$m$为当日分钟数、$d$为星期索引，前四项为
+\[\sin\frac{2\pi m}{1440},\quad\cos\frac{2\pi m}{1440},\quad
+\sin\frac{2\pi(1440d+m)}{10080},\quad\cos\frac{2\pi(1440d+m)}{10080}.\]
+再把目标的昨日同期$D_{t-48}$这60维复制至各历史步，故每步$60+6+60=126$维，实际\textbf{输入为$[B,48,126]$，输出为$[B,1,60]$}。不能把48个时间步展平后当成输入投影层的维度。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.6\textwidth]{爬取完成.png}
-\caption{数据爬取完成后的数据库记录统计}
-\end{figure}
+需求先做$\log(1+D)$，再以训练区间逐通道均值$\mu$和标准差$\sigma$做z-score；时间特征不做同一需求变换。验证、测试沿用训练统计量，测试数据不参与拟合归一化。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.42\textwidth]{下载pytorch.png}\hfill
-\includegraphics[width=0.5\textwidth]{虚拟环境验证pytorch.png}
-\caption{Python虚拟环境配置与PyTorch安装验证}
-\end{figure}
+\subsection{残差学习与主实验配置}
+记标准化对数需求为$z_t$，学习$r_t=z_t-z_{t-48}$，还原公式为
+\[\hat D_t=\max\{\exp[(\hat r_t+z_{t-48})\sigma+\mu]-1,0\}.\]
+残差位于\textbf{标准化对数域}，不是原始订单数直接相减。Transformer逐步投影126维输入，加位置编码，经时间编码器后取最后一步隐状态输出60维残差。各网格通道由多输出网络联合预测，没有显式的地理邻接图。
+\begin{table}[H]\centering\small\caption{主实验既有检查点配置}
+\begin{tabular}{lll}\toprule
+配置 & Transformer & LSTM\\\midrule
+输入/输出 & $48\times126$ / $1\times60$ & 同左\\
+隐层/层数 & 32 / 1 & 64 / 1\\
+注意力头/前馈层 & 4 / 64 & 不适用\\
+dropout & 0.05 & 0\\
+学习率/最大轮数 & $3\times10^{-5}$ / 100 & $10^{-4}$ / 80\\
+优化/损失 & AdamW / Huber & AdamW / Huber\\
+早停耐心/种子 & 20 / 42 & 15 / 42\\\bottomrule
+\end{tabular}\end{table}
+检查点分别为\texttt{transformer\_residual\_lr3e5}和\texttt{lstm\_residual}。可选“空间注意力”代码是隐通道的可学习混合，不等同于真实网格图上的图神经网络，故不作为已完成图建模成果。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.65\textwidth]{分区块.png}
-\caption{城市空间划分成 $0.01\^\circ × 0.01\^\circ$ 网格并筛选高需求区域}
-\end{figure}
+\subsection{简单基线与公平比较}
+历史平均按训练集“星期几$\times$半小时槽”求逐通道均值，未见槽回退至训练总体均值；昨日同期直接用$D_{t-48}$。LSTM使用相同输入、残差目标和时间划分。均在同一测试窗口、同一60通道上，还原原始计数后评估，不能用验证标准化损失代替订单数MAE。
 
-\subsection{时间分布特征}
-对每日订单总量进行统计后发现，数据在时间上分布极不均匀（图\ref{fig:daily}）：2021年1月1日至1月29日期间，全城日订单量仅约300--1100单；而1月30日之后突然跃升至每天11万至72万单，量级相差数百倍。这表明API返回的订单子集在时间维度上存在严重偏斜，前29天数据几乎不构成有效需求信号。
+\section{划分、指标与既有实验结果}
+\subsection{主实验：70\%/15\%/15\%顺序划分}
+1565步的训练终点索引1095、验证终点1330。前48步只作历史上下文；训练批次可随机打乱，但集合按目标时间顺序切分，不随机混分。
+\begin{table}[H]\centering\small\caption{主实验目标窗口划分（时间均为半小时槽起点）}
+\begin{tabular}{lllr}\toprule
+集合 & 第一个目标 & 最后一个目标 & 窗口数\\\midrule
+训练 & 01/02 00:00 & 01/23 19:00 & 1,047\\
+验证 & 01/23 19:30 & 01/28 16:30 & 235\\
+测试 & 01/28 17:00 & 02/02 14:00 & 235\\\bottomrule
+\end{tabular}\end{table}
+\textbf{限制：}训练和验证基本处于稀疏样本段，而测试包含高量段，存在严重分布偏移。滚动测试的昨日同期基线可使用此前已发生的测试期观测，这是合法单步在线设定，不能称为“抄答案”，也不等于固定起点多日预测。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figs/daily_orders.pdf}
-\caption{每日订单总量分布，1月30日之后量级骤增}
-\label{fig:daily}
-\end{figure}
+\subsection{评价指标与主结果}
+令$M$为测试槽$\times60$通道元素数，$e_i=\hat y_i-y_i$，使用
+\[\mathrm{MAE}=\frac1M\sum_i|e_i|,\qquad\mathrm{RMSE}=\sqrt{\frac1M\sum_i e_i^2},\]
+\[\mathrm{MAPE}_{\epsilon}=\frac{100}{M}\sum_i\frac{|e_i|}{\max(|y_i|,1)},\qquad
+\mathrm{WMAPE}=100\frac{\sum_i|e_i|}{\max(\sum_i|y_i|,1)}.\]
+MAE、RMSE单位为次/网格/30分钟（单个借或还通道）。RMSE更重视大误差。MAPE分母下限1处理零值，但低需求仍会放大相对误差，故结合MAE、RMSE和WMAPE解释。
+\begin{table}[H]\centering\small\caption{主实验同一测试集结果（来自既有指标文件）}
+\begin{tabular}{lrrrr}\toprule
+模型 & MAE & RMSE & MAPE$_\epsilon$(\%) & WMAPE(\%)\\\midrule
+历史平均 & 101.20 & 198.86 & 72.29 & 99.93\\
+昨日同期 & \textbf{60.41} & \textbf{122.22} & 584.94 & \textbf{59.65}\\
+LSTM残差 & 62.34 & 124.29 & 518.29 & 61.55\\
+Transformer残差 & 61.01 & 122.78 & 564.90 & 60.25\\\bottomrule
+\end{tabular}\end{table}
+\fig{figs/model_compare.pdf}{.85}{既有主实验MAE/RMSE图，属于比例划分，与下节日期实验不同。}
+Transformer相对历史平均MAE下降约39.71\%，却比昨日同期高约1.00\%；LSTM也未超过昨日同期，\textbf{不能声称复杂模型优于全部基线}。历史均值的MAPE较低而MAE更大，反映低量槽对MAPE排名的影响。
 
-对高量数据段（1月30日至2月2日）按30分钟粒度展开（图\ref{fig:series}），可观察到明显的日内双峰结构：早高峰约在8:00--10:00，晚高峰约在16:00--19:00，与通勤出行规律一致。0:00--6:00时段需求极低，是典型的共享单车使用模式。
+\subsection{补充：高量段日期划分实验}
+另一套既有实验的训练目标为01/30 13:00--01/31 19:30（62窗），验证01/31 20:00--02/01 03:30（16窗），测试02/01 04:00--02/02 14:00（69窗）。首批训练输入仍使用起点前24小时历史，不能称历史输入全部高量。其Transformer为64隐层、2层、4头、前馈128、dropout 0.05、学习率$10^{-4}$，检查点\texttt{transformer\_date\_full}。
+\begin{table}[H]\centering\small\caption{补充日期实验：不同测试集，不能直接与主实验相减}
+\begin{tabular}{lrrr}\toprule
+模型 & MAE & RMSE & WMAPE(\%)\\\midrule
+历史平均（原实现） & 231.73 & 339.44 & 98.44\\
+昨日同期 & 124.36 & 203.91 & 52.83\\
+Transformer残差 & 133.23 & 216.48 & 56.60\\\bottomrule
+\end{tabular}\end{table}
+该历史平均的回退均值从序列起点取至训练终点，包含早期稀疏样本，不是仅用62个高量时点；这里保留原实现结果。没有既有同日期划分的LSTM结果，故不填空或借用比例实验。该实验亦未证明Transformer超越昨日同期。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figs/high_volume_series.pdf}
-\caption{高量数据段30分钟粒度时序，呈现早晚双峰}
-\label{fig:series}
-\end{figure}
+\section{空间误差与原因分析}
+\subsection{网格误差分布与地理对应}
+主实验的网格借/还MAE分别在235个目标上平均。图按元数据需求排名索引0--29显示误差，是\textbf{空间单元间比较}，不能误称为带底图的地理热力图。
+\fig{figs/spatial_error.pdf}{.98}{主实验Transformer的30网格借/还MAE。编号为数组索引，非行政区或站点名。}
+\begin{table}[H]\centering\small\caption{高误差网格的空间对应（BD09原始坐标）}
+\begin{tabular}{rrrrr}\toprule
+图中索引 & 网格ID & 中心经度 & 中心纬度 & 借还平均MAE\\\midrule
+0 & 14042 & 114.125 & 22.545 & 113.98\\
+1 & 14041 & 114.115 & 22.545 & 94.92\\
+2 & 14038 & 114.085 & 22.545 & 89.34\\
+5 & 13035 & 114.055 & 22.535 & 74.34\\
+3 & 12034 & 114.045 & 22.525 & 72.35\\\bottomrule
+\end{tabular}\end{table}
+借车总体MAE约61.47，还车约60.56。网格0的借还平均MAE约113.98，显著高于不少后部网格的约45--60。30网格平均真实需求与其平均MAE的Pearson相关系数约0.98，支持\textbf{本样本中高需求规模与高绝对误差相关}；不证明相对误差或土地利用因果。
 
-\subsection{空间分布特征}
-30个高需求网格集中在深圳市中心城区，覆盖CBD、大型居住区和轨道交通枢纽周边。借车与还车量在这些网格间的分布相对均衡，但个别网格的峰值需求显著高于其他网格，反映出职住通勤的不对称流动特征。
-
-\section{预测建模}
-
-\subsection{方法设计}
-采用Transformer编码器结构，输入过去24小时（48个30分钟步）的借还车需求及时间周期特征（日内正弦/余弦、周内正弦/余弦、周末标记、高峰标记），输出未来30分钟的60维需求向量。
-
-考虑到previous-day基线对日周期惯性的强捕捉能力，模型采用\textbf{残差学习}策略：预测目标不是绝对需求，而是目标时刻需求减去前一日同时刻需求的修正量。评估时将预测残差加回基线再还原为订单数。这一设计使模型直接学习"何时偏离昨日模式"，避免了从头学习周期性。
-
-\subsection{特征构造方法}
-模型输入由三部分特征拼接而成：
+\subsection{时间分组与误差解释}
+\begin{table}[H]\centering\small\caption{主实验Transformer的分时段误差}
+\begin{tabular}{lrrr}\toprule
+时段 & 测试槽数 & MAE & WMAPE(\%)\\\midrule
+早高峰 & 30 & 116.26 & 49.14\\
+晚高峰 & 30 & 93.60 & 58.98\\
+平峰 & 95 & 73.86 & 70.14\\
+夜间 & 80 & 12.82 & 52.94\\\bottomrule
+\end{tabular}\end{table}
+分组包含稀疏与高量日期，不代表独立多周评估。早峰MAE最高、夜间最低，空间误差可作如下解释：
 \begin{enumerate}
-\item \textbf{需求特征}：过去24小时（48个30分钟步）30个网格的借车量与还车量，共 $48 \times 60 = 2880$ 维。这是模型的主要信号来源。
-\item \textbf{目标时刻滞后特征}：前一日同时刻（lag=48步）的借还车量，共60维。该特征为previous-day基线提供了显式通道，使残差学习成为可能。
-\item \textbf{时间周期特征}：对预测目标时刻构造以下5个特征：
-  \begin{itemize}
-  \item 日内正弦 $\sin(2\pi t / 48)$ 与余弦 $\cos(2\pi t / 48)$，其中 $t$ 为30分钟步索引；
-  \item 周内正弦 $\sin(2\pi d / 7)$ 与余弦 $\cos(2\pi d / 7)$，其中 $d$ 为星期索引；
-  \item 周末二值标记（周六、周日为1，其余为0）。
-  \end{itemize}
-\end{enumerate}
-所有需求特征在训练集上做z-score标准化，避免数据泄露。模型的输出为未来30分钟60维（借车+还车各30网格）需求向量。
-
-\subsection{数据划分}
-发现数据分布不均匀后，将划分方式从按比例改为\textbf{按日期划分}：
-\begin{itemize}
-\item 训练集：2021-01-30 13:00 至 2021-01-31 20:00（高量数据段）
-\item 验证集：2021-01-31 20:00 至 2021-02-01 04:00
-\item 测试集：2021-02-01 04:00 至 2021-02-02 14:00
-\end{itemize}
-
-\subsection{评价指标与结果}
-采用MAE、RMSE、MAPE、WMAPE四项指标，结果见表\ref{tab:metrics}。
-
-\begin{table}[H]
-\centering
-\caption{模型测试集误差对比（按日期划分）}
-\label{tab:metrics}
-\begin{tabular}{lrrr}
-\toprule
-模型 & MAE & RMSE & WMAPE(\%) \\
-\midrule
-historical\_mean & 231.7 & 339.4 & 98.44 \\
-previous-day（昨日同期） & 124.4 & 203.9 & 52.83 \\
-LSTM（残差） & --- & --- & --- \\
-Transformer（残差） & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{figs/model_compare.pdf}
-\caption{各模型MAE与RMSE对比（比例划分下）}
-\label{fig:compare}
-\end{figure}
-
-在按比例划分（训练1/1--1/29，测试2/1--2/2）的实验中，Transformer残差模型MAE=61.0、RMSE=122.8，LSTM残差模型MAE=62.3、RMSE=124.3，previous-day基线MAE=60.4、RMSE=122.2，historical\_mean基线MAE=101.2、RMSE=198.9（图\ref{fig:compare}）。
-
-\subsection{训练过程}
-Transformer训练120轮，验证集loss在第39轮达到最低（0.1418）后早停（图\ref{fig:curve}）。训练曲线显示loss从0.41平滑下降至0.14，无明显震荡，说明残差建模有效稳定了训练过程。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{figs/train_curve.pdf}
-\caption{Transformer按日期划分的训练曲线}
-\label{fig:curve}
-\end{figure}
-
-以下截图记录了Transformer和LSTM的首次训练结果与调优后的对比。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.45\textwidth]{transformer第一次训练.png}\hfill
-\includegraphics[width=0.45\textwidth]{transformer第一次训练结果.png}
-\caption{Transformer首次训练过程与测试结果}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.5\textwidth]{优化后的transformer.png}\hfill
-\includegraphics[width=0.45\textwidth]{lstm第一次训练结果.png}
-\caption{左：调优后Transformer训练曲线；右：LSTM首次训练结果}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.55\textwidth]{优化后的lstm.png}
-\caption{LSTM调优后的训练曲线}
-\end{figure}
-
-
-\section{误差空间分布分析}
-
-对Transformer在测试集上各网格的MAE进行分解（图\ref{fig:spatial}），发现误差在空间上分布不均：部分网格MAE显著高于平均，主要集中在高峰时段订单量最大的网格；而需求较少的网格误差较小。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figs/spatial_error.pdf}
-\caption{Transformer测试集各网格MAE分布（左：借车，右：还车）}
-\label{fig:spatial}
-\end{figure}
-
-误差在空间上呈现"高需求--高误差"的正相关关系，原因包括：
-\begin{enumerate}
-\item \textbf{需求绝对量大}：高峰期单网格30分钟订单可达数千辆，即使相对误差仅10\%，绝对MAE也远高于低需求网格；
-\item \textbf{需求波动性更强}：高需求网格对突发事件（天气变化、交通管制、周边活动）更敏感，昨日同期基线难以捕捉这类偏离；
-\item \textbf{数据量不足}：训练段仅约31小时高量数据，模型无法充分学习不同网格在不同时段的差异化模式，只能学到全局性的周期修正。
+\item \textbf{规模效应：}大流量区域即使同比例误差，也会对应更大绝对偏差；网格图与相关系数支持这一样本描述。
+\item \textbf{日型转换与样本不足：}高量段仅几天，周日到周一早峰结构变化，训练数据不足以学习稳定的残差修正。
+\item \textbf{采集偏移与选择：}低量训练、高量测试及末日不完整会影响偏差；30网格按全期热度选择，包含测试期空间筛选信息。只用训练集归一化不等于完全排除了选择偏差。
+\item \textbf{未验证解释：}天气、活动、轨道接驳和POI可能影响局部需求，但未融合相应数据，不能写作已经证实的成因。
 \end{enumerate}
 
-\section{原因总结与讨论}
+\section{结论、局限与可运行代码}
+已完成订单清洗、半小时借还聚合、日类型与高峰样本分析、基线和神经模型比较，以及空间误差分解。主实验Transformer MAE为61.01，昨日同期60.41；日期实验分别133.23和124.36，两者都未证明Transformer优于昨日同期。
 
-\subsection{previous-day基线为何难以超越}
-previous-day基线本质上是把"昨日同时刻真实需求"作为预测值，它免费获取了48步连续的真实观测信号，对具有强日周期惯性的通勤型出行需求捕捉能力极强。在本数据集上，测试集仅约2天且紧邻训练段，日间相关性极高，导致该基线接近"抄答案"的效果。
+后续优先补充覆盖一致的连续多周数据、仅用训练期选区域，采用多个滚动起点测试；再加入上一时段持久性基线、天气、POI或真实空间结构。上述是\textbf{后续建议}，不列为已完成实验。周末/工作日各只有一个完整高量日，时间覆盖偏移、单切分和小样本限制了泛化结论。
 
-Transformer残差模型已将previous-day作为硬编码起点，模型只学习修正量，但在数据量有限（有效高量训练数据约31小时）的条件下，能学到的修正模式非常有限，最终MAE仅比基线高0.6（61.0 vs 60.4），接近但未能超越。
-
-\subsection{深度模型的适用条件}
-结合实验结果与相关文献，Transformer等深度模型要体现出对简单基线的明显优势，通常需要：
-\begin{itemize}
-\item \textbf{更长时间跨度}的数据（数月以上），以学习不同周、不同节假日、不同天气下的多样化模式；
-\item \textbf{测试集与训练集存在真实分布差异}，而非相邻时段的高相关；
-\item \textbf{额外特征}（天气、POI、空间拓扑等），这些是previous-day基线完全无法利用的信号。
+代码随项目提交，依赖见\texttt{requirements.txt}。聚合、Transformer与LSTM的入口分别为：
+\begin{itemize}\small
+\item \path{src/aggregate_demand.py}
+\item \path{src/train_transformer.py}
+\item \path{src/train_lstm.py}
 \end{itemize}
-
-\subsection{本次实验的局限}
-\begin{itemize}
-\item 数据覆盖仅32天，且前29天几乎无有效订单，时间分布严重偏斜；
-\item 高量数据仅约4天，测试集进一步缩减至约1.4天，样本量过小；
-\item 未融合天气、POI等外部数据；
-\item 空间维度上30个网格独立预测，空间注意力模块虽已实现，但因测试集过短未能体现优势。
+检查点目录（各含指标与预测文件）：
+\begin{itemize}\small
+\item 主实验Transformer：\path{checkpoints/transformer_residual_lr3e5}
+\item 主实验LSTM：\path{checkpoints/lstm_residual}
+\item 日期实验：\path{checkpoints/transformer_date_full}
 \end{itemize}
+通用说明见\path{docs/training_pipeline.md}，本实验参数以下方命令为准。部分旧预测文件的\texttt{times}字段单位异常，主实验日期按聚合数组的测试索引核对。项目原有仓库地址为\url{https://github.com/wyyy520/BikeDemand}。
 
-\section{总结}
-本作业完成了共享单车需求的时空特征分析、Transformer残差预测模型的构建与训练，并与historical\_mean、previous-day、LSTM等基线进行了系统对比。主要结论：
-\begin{enumerate}
-\item 共享单车需求具有明显的日内双峰周期和工作日/周末差异，previous-day基线因此表现很强；
-\item 残差建模使Transformer从previous-day水平出发学习修正量，有效提升了训练效率与最终精度；
-\item 在数据覆盖短、时段单一的不利条件下，Transformer（MAE=61.0）接近previous-day（60.4）而未超越，反映出深度模型对数据量的依赖；
-\item 误差空间分布呈"高需求--高误差"特征，主要由需求绝对量大、波动性强和数据不足共同造成。
-\end{enumerate}
+以下命令可从项目根目录运行；依赖安装步骤按项目环境选择执行。
+\begin{lstlisting}
+python -m pip install -r requirements.txt
+python src/aggregate_demand.py --input data/processed/orders_2021_clean.sqlite --output data/processed/demand_2021_30min.npz --top-grids 30
+python src/train_transformer.py --data data/processed/demand_2021_30min.npz --output-dir checkpoints/reproduce_transformer --d-model 32 --nhead 4 --layers 1 --ffn-dim 64 --dropout 0.05 --lr 0.00003 --epochs 100 --patience 20
+python src/train_lstm.py --data data/processed/demand_2021_30min.npz --output-dir checkpoints/reproduce_lstm --hidden-dim 64 --layers 1 --dropout 0 --lr 0.0001 --epochs 80 --patience 15
+\end{lstlisting}
+默认lookback为48、horizon为1、种子42、批量64，比例划分70\%/15\%。
 
-若后续继续改进，建议优先扩大数据时间跨度、融合天气与POI特征，并在更充分的测试条件下重新评估空间注意力的作用。
-
-
-
-\newpage
-\section{附录：主要源代码}
-以下列出核心模块的关键代码，完整代码请参见GitHub仓库：\url{https://github.com/wyyy520/BikeDemand}。
-
-\subsection{Transformer模型定义（src/transformer\_model.py）}
-\lstinputlisting[language=Python]{../src/transformer_model.py}
-
-\subsection{Transformer训练脚本（src/train\_transformer.py）}
-\lstinputlisting[language=Python]{../src/train_transformer.py}
-
-\subsection{LSTM模型定义（src/lstm\_model.py）}
-\lstinputlisting[language=Python]{../src/lstm_model.py}
-
-\subsection{需求聚合脚本（src/aggregate\_demand.py）}
-\lstinputlisting[language=Python]{../src/aggregate_demand.py}
-
+\appendix\section{既有过程素材与小组协作}
+\fig{爬取300万数据集数据库.png}{.66}{原有数据采集截图，仅作为实现过程证据，不代替分析图。}
+\begin{figure}[H]\centering\includegraphics[width=.46\linewidth]{优化后的transformer.png}\hfill\includegraphics[width=.46\linewidth]{优化后的lstm.png}\caption{原有调试过程截图，可能对应不同版本，不代替已标明检查点的正式指标表。}\end{figure}
+课程要求4--6人共同讨论与分工。尚未提供真实姓名、学号及具体贡献，以下留待小组填写，实际共同制定的方案与分工应据实补充。
+\begin{table}[H]\centering\small\begin{tabular}{p{.25\linewidth}p{.62\linewidth}}\toprule
+姓名/学号 & 实际承担工作与共同讨论内容\\\midrule
+\rule{0pt}{2.8ex} & \\
+\rule{0pt}{2.8ex} & \\
+\rule{0pt}{2.8ex} & \\
+\rule{0pt}{2.8ex} & \\
+\rule{0pt}{2.8ex} & \\
+\rule{0pt}{2.8ex} & \\\bottomrule\end{tabular}\end{table}
 \end{document}
